@@ -18,14 +18,15 @@ public class OGMercuryVision extends WPICameraExtension {
     public static final String NAME = "OG Vision Tracking";
 
     // Constants that need to be tuned
+    private static final double maxRatioError = 0.3;
     private static final double kNearlyHorizontalSlope = Math.tan(Math.toRadians(20));
     private static final double kNearlyVerticalSlope = Math.tan(Math.toRadians(90-20));
-    private static final int kMinHorWidth = 40; 
-    private static final int kMinHorHeight = 10; 
+    private static final int kMinHorWidth = 35; 
+    private static final int kMinHorHeight = 5; 
     private static final int kMaxHorWidth = 150;
     private static final int kMaxHorHeight = 20;
-    private static final int kMinVertWidth = 10;
-    private static final int kMinVertHeight = 50;
+    private static final int kMinVertWidth = 5;
+    private static final int kMinVertHeight = 45;
     private static final int kMaxVertWidth = 30;
     private static final int kMaxVertHeight = 200;
     private static final double kRangeOffset = 0.0; //TODO
@@ -38,7 +39,8 @@ public class OGMercuryVision extends WPICameraExtension {
     // Store JavaCV temporaries as members to reduce memory management during processing
     private opencv_core.CvSize size = null;
     private WPIContour[] contours;
-    private ArrayList<WPIPolygon> polygons;
+    private ArrayList<WPIPolygon> horiz;
+    private ArrayList<WPIPolygon> vert;
     private opencv_imgproc.IplConvKernel morphKernel;
     private opencv_core.IplImage bin;
     private opencv_core.IplImage hsv;
@@ -96,22 +98,31 @@ public class OGMercuryVision extends WPICameraExtension {
         WPIBinaryImage binWPI = makeWPIBinaryImage(bin);
         contours = findConvexContours(binWPI);
         
-        polygons = new ArrayList<>();
-        for (WPIContour c : contours)
-        {
+        horiz = new ArrayList<>();
+        vert = new ArrayList<>();
+        for (WPIContour c : contours) {
             double ratio = ((double) c.getHeight()) / ((double) c.getWidth());
-            if (ratio < 1.0 && ratio > 0.5 && c.getWidth() > Math.min(kMinHorWidth, kMinVertWidth) && c.getWidth() < Math.max(kMaxHorWidth, kMaxVertWidth))
-            {
-                polygons.add(c.approxPolygon(20));
+            if (relativeError(ratio, 4/23.5) < maxRatioError && contains(kMinHorWidth, kMaxHorWidth, c.getWidth())) {
+                horiz.add(c.approxPolygon(20));
+            } else if (relativeError(ratio, 32.0/4) < maxRatioError && contains(kMinVertHeight, kMaxVertHeight, c.getHeight())) {
+                vert.add(c.approxPolygon(20));
             }
         }
         
-        result.setTitle("" + polygons.size());
+        result.setTitle("H: " + horiz.size() + "V: " + vert.size());
         
         result.showImage(bin.getBufferedImage());
         
         opencv_core.cvClearMemStorage(storage);
         return raw;
+    }
+    
+    public static double relativeError(double result, double expected) {
+        return Math.abs((result - expected) / expected);
+    }
+    
+    public static boolean contains(double lower, double upper, double value) {
+        return lower <= value && upper >= value;
     }
     
     public static WPIBinaryImage makeWPIBinaryImage(IplImage arr) {
