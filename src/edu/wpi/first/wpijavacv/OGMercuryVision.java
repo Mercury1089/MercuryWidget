@@ -5,6 +5,7 @@ import com.googlecode.javacv.cpp.opencv_core;
 import com.googlecode.javacv.cpp.opencv_core.IplImage;
 import com.googlecode.javacv.cpp.opencv_imgproc;
 import edu.wpi.first.smartdashboard.camera.WPICameraExtension;
+import java.awt.Polygon;
 import java.util.ArrayList;
 
 public class OGMercuryVision extends WPICameraExtension {
@@ -12,13 +13,13 @@ public class OGMercuryVision extends WPICameraExtension {
     //Camera constants used for distance calculation
     private final int X_RES = 640;		
     private final int Y_RES = 480;		
-    private final double VERT_FOV = 49.0;     //Axis M1013
-    private final double HOR_FOV = 67.0;  //Axis M1013 camera
+    private final double VERT_FOV = Math.toRadians(49.0);     //Axis M1013
+    private final double HOR_FOV = Math.toRadians(67.0);  //Axis M1013 camera
     
     public static final String NAME = "OG Vision Tracking";
 
     // Constants that need to be tuned
-    private static final double maxRatioError = 0.3; //TODO
+    private static final double maxRatioError = 0.8; //TODO
     private static final double kNearlyHorizontalSlope = Math.tan(Math.toRadians(20));
     private static final double kNearlyVerticalSlope = Math.tan(Math.toRadians(90-20));
     private static final int kMinHorWidth = 35; 
@@ -108,8 +109,11 @@ public class OGMercuryVision extends WPICameraExtension {
                 vert.add(c.approxPolygon(20));
             }
         }
-        
-        result.setTitle("H: " + horiz.size() + "   V: " + vert.size());
+        if(vert.size() > 0) {
+            result.setTitle("H: " + horiz.size() + " V: " + vert.size() + " D: " + getDistance(vert.get(0)));
+        } else {
+            result.setTitle("no vertical targets");
+        }
         
         result.showImage(bin.getBufferedImage());
         
@@ -151,5 +155,13 @@ public class OGMercuryVision extends WPICameraExtension {
         tempImage.release();
         WPIContour[] array = new WPIContour[results.size()];
         return results.toArray(array);
+    }
+    
+    public double getDistance(WPIPolygon polygon){
+        double distance = (Y_RES * 32 / 12.0) / (polygon.getHeight() * 2 * Math.tan(VERT_FOV / 2.0));
+        
+        distance = Math.round(distance * 100) / 100;
+        
+        return distance;
     }
 }
