@@ -19,10 +19,11 @@ public class OGMercuryVision extends WPICameraExtension {
     public static final String NAME = "OG Vision Tracking";
 
     // Constants that need to be tuned
-    private static final double maxRatioError = 0.8; //TODO
+    private static final double maxHorError = 0.9; //TODO
+    private static final double maxVertError = 0.6; //TODO
     private static final double kNearlyHorizontalSlope = Math.tan(Math.toRadians(20));
     private static final double kNearlyVerticalSlope = Math.tan(Math.toRadians(90-20));
-    private static final int kMinHorWidth = 35; 
+    private static final int kMinHorWidth = 30; 
     private static final int kMinHorHeight = 5; 
     private static final int kMaxHorWidth = 150;
     private static final int kMaxHorHeight = 20;
@@ -81,7 +82,7 @@ public class OGMercuryVision extends WPICameraExtension {
         
         //remove pixels where H < 45 or H > 75
         opencv_imgproc.cvThreshold(hue, bin, 60-15, 255, opencv_imgproc.CV_THRESH_BINARY); //TODO change values maybe
-        opencv_imgproc.cvThreshold(hue, hue, 60+15, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
+        opencv_imgproc.cvThreshold(hue, hue, 60+25, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
         
         // remove pixels that aren't colorful enough
         opencv_imgproc.cvThreshold(sat, sat, 200, 255, opencv_imgproc.CV_THRESH_BINARY);
@@ -103,9 +104,9 @@ public class OGMercuryVision extends WPICameraExtension {
         vert = new ArrayList<>();
         for (WPIContour c : contours) {
             double ratio = ((double) c.getHeight()) / ((double) c.getWidth());
-            if (relativeError(ratio, 4/23.5) < maxRatioError && contains(kMinHorWidth, kMaxHorWidth, c.getWidth())) {
+            if (relativeError(ratio, 4/23.5) < maxHorError && contains(kMinHorWidth, kMaxHorWidth, c.getWidth())) {
                 horiz.add(c.approxPolygon(20));
-            } else if (relativeError(ratio, 32.0/4) < maxRatioError && contains(kMinVertHeight, kMaxVertHeight, c.getHeight())) {
+            } else if (relativeError(ratio, 32.0/4) < maxVertError && contains(kMinVertHeight, kMaxVertHeight, c.getHeight())) {
                 vert.add(c.approxPolygon(20));
             }
         }
@@ -160,8 +161,6 @@ public class OGMercuryVision extends WPICameraExtension {
     public double getDistance(WPIPolygon polygon){
         double distance = (Y_RES * 32 / 12.0) / (polygon.getHeight() * 2 * Math.tan(VERT_FOV / 2.0));
         
-        distance = Math.round(distance * 100) / 100;
-        
-        return distance;
+        return (int)(distance * 100) / 100.0;
     }
 }
