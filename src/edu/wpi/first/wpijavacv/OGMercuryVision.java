@@ -18,13 +18,9 @@ public class OGMercuryVision extends WPICameraExtension {
     
     public static final String NAME = "OG Vision Tracking";
 
-    // Constants that need to be tuned
-<<<<<<< HEAD
     private static final double maxHorError = 0.9; //TODO
     private static final double maxVertError = 0.6; //TODO
-=======
     private static final double maxRatioError = 0.3; //TODO
->>>>>>> caa213b9af27d899a07b439c16d943d92ceafffb
     private static final double kNearlyHorizontalSlope = Math.tan(Math.toRadians(20));
     private static final double kNearlyVerticalSlope = Math.tan(Math.toRadians(90-20));
     private static final int kMinHorWidth = 30; 
