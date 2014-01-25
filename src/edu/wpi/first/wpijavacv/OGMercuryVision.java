@@ -1,12 +1,17 @@
 package edu.wpi.first.wpijavacv;
 
-import com.googlecode.javacv.CanvasFrame;
 import com.googlecode.javacv.cpp.opencv_core;
 import com.googlecode.javacv.cpp.opencv_core.IplImage;
 import com.googlecode.javacv.cpp.opencv_imgproc;
 import edu.wpi.first.smartdashboard.camera.WPICameraExtension;
-import java.awt.Polygon;
+import java.awt.BorderLayout;
+import java.awt.GridLayout;
 import java.util.ArrayList;
+import javax.swing.JCheckBox;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JSpinner;
+import javax.swing.SpinnerNumberModel;
 
 public class OGMercuryVision extends WPICameraExtension {
     
@@ -32,6 +37,9 @@ public class OGMercuryVision extends WPICameraExtension {
     private static final int kMaxVertWidth = 30;
     private static final int kMaxVertHeight = 200;
     private static final double kRangeOffset = 0.0; //TODO
+    private double maxHue = 90, minHue = 45, 
+                   maxSat = 255, minSat = 200, 
+                   maxVal = 255, minVal = 55;
 
     private static final double kShooterOffsetDeg = 0; //TODO
 
@@ -52,13 +60,64 @@ public class OGMercuryVision extends WPICameraExtension {
     private WPIPoint linePt1;
     private WPIPoint linePt2;
     private int horizontalOffsetPixels;
-    private CanvasFrame result = new CanvasFrame("binary");
+    private WPIBinaryImage binWPI;
     
     private static opencv_core.CvMemStorage storage;
+    
+    private JLabel distanceID, distanceVal;
+    private JLabel hueID, satID, valID;
+    private JSpinner hueUpper, hueLower, satUpper, satLower, valUpper, valLower;
+    private JCheckBox dispBinary;
     
     public OGMercuryVision() {
         morphKernel = opencv_imgproc.IplConvKernel.create(3, 3, 1, 1, opencv_imgproc.CV_SHAPE_RECT, null);
         storage = opencv_core.CvMemStorage.create();
+    }
+    
+    @Override
+    public void init() {
+        super.init();
+        this.setLayout(new BorderLayout());
+        
+        distanceVal = new JLabel();
+        distanceID = new JLabel("Distance:");
+        hueID = new JLabel("Hue Limits:");
+        satID = new JLabel("Sat Limits:");
+        valID = new JLabel("Val Limits:");
+        
+        dispBinary = new JCheckBox("Display Binary");
+        
+        hueUpper = new JSpinner(new SpinnerNumberModel(maxHue, 0, 255, 1));
+        hueLower = new JSpinner(new SpinnerNumberModel(minHue, 0, 255, 1));
+        satUpper = new JSpinner(new SpinnerNumberModel(maxSat, 0, 255, 1));
+        satLower = new JSpinner(new SpinnerNumberModel(minSat, 0, 255, 1));
+        valUpper = new JSpinner(new SpinnerNumberModel(maxVal, 0, 255, 1));
+        valLower = new JSpinner(new SpinnerNumberModel(minVal, 0, 255, 1));
+        
+        JPanel controls = new JPanel();
+        controls.setLayout(new GridLayout(8, 2));
+        controls.add(dispBinary);
+        controls.add(new JLabel());
+        controls.add(distanceID);
+        controls.add(distanceVal);
+        controls.add(hueID);
+        controls.add(hueUpper); 
+        controls.add(new JLabel());
+        controls.add(hueLower);
+        controls.add(satID);
+        controls.add(satUpper);
+        controls.add(new JLabel());
+        controls.add(satLower);
+        controls.add(valID);
+        controls.add(valUpper);
+        controls.add(new JLabel());
+        controls.add(valLower);
+        
+        /*for(int i = 0; i < controls.getComponentCount(); i++) {
+            controls.getComponent(i).setSize(controls.getComponent(i).getWidth(), 25);
+        }*/
+        
+        add(BorderLayout.WEST, controls);
     }
     
     @Override
@@ -75,20 +134,30 @@ public class OGMercuryVision extends WPICameraExtension {
             linePt1 = new WPIPoint(size.width()/2+horizontalOffsetPixels,size.height()-1);
             linePt2 = new WPIPoint(size.width()/2+horizontalOffsetPixels,0);
         }
+        
+        minHue = (Double)hueLower.getValue();
+        maxHue = (Double)hueUpper.getValue();
+        
+        minSat = (Double)satLower.getValue();
+        maxSat = (Double)satUpper.getValue();
+        
+        minVal = (Double)valLower.getValue();
+        maxVal = (Double)valUpper.getValue();
+        
         //split the image into H, S, and V layers
         IplImage input = raw.image;
         opencv_imgproc.cvCvtColor(input, hsv, opencv_imgproc.CV_BGR2HSV);
         opencv_core.cvSplit(hsv, hue, sat, val, null);
         
         //remove pixels where H < 45 or H > 75
-        opencv_imgproc.cvThreshold(hue, bin, 60-15, 255, opencv_imgproc.CV_THRESH_BINARY); //TODO change values maybe
-        opencv_imgproc.cvThreshold(hue, hue, 60+25, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
+        opencv_imgproc.cvThreshold(hue, bin, minHue, 255, opencv_imgproc.CV_THRESH_BINARY); //TODO change values maybe
+        opencv_imgproc.cvThreshold(hue, hue, maxHue, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
         
         // remove pixels that aren't colorful enough
-        opencv_imgproc.cvThreshold(sat, sat, 200, 255, opencv_imgproc.CV_THRESH_BINARY);
+        opencv_imgproc.cvThreshold(sat, sat, minSat, maxSat, opencv_imgproc.CV_THRESH_BINARY);
 
         // remove pixels that are too dim
-        opencv_imgproc.cvThreshold(val, val, 55, 255, opencv_imgproc.CV_THRESH_BINARY);
+        opencv_imgproc.cvThreshold(val, val, minVal, maxVal, opencv_imgproc.CV_THRESH_BINARY);
         
         //combine all images, hopefully remaining pixels are targets
         opencv_core.cvAnd(hue, bin, bin, null);
@@ -97,7 +166,7 @@ public class OGMercuryVision extends WPICameraExtension {
 
         opencv_imgproc.cvMorphologyEx(bin, bin, null, morphKernel, opencv_imgproc.CV_MOP_CLOSE, 1);
 
-        WPIBinaryImage binWPI = makeWPIBinaryImage(bin);
+        binWPI = makeWPIBinaryImage(bin);
         contours = findConvexContours(binWPI);
         
         horiz = new ArrayList<>();
@@ -111,15 +180,16 @@ public class OGMercuryVision extends WPICameraExtension {
             }
         }
         if(vert.size() > 0) {
-            result.setTitle("H: " + horiz.size() + " V: " + vert.size() + " D: " + getDistance(vert.get(0)));
+            distanceVal.setText("" + getDistance(vert.get(0)));
         } else {
-            result.setTitle("no vertical targets");
+            distanceVal.setText("NONE");
         }
         
-        result.showImage(bin.getBufferedImage());
-        
         opencv_core.cvClearMemStorage(storage);
-        return raw;
+        if(dispBinary.isSelected()) {
+            return binWPI;
+        } else
+            return raw;
     }
     
     public static double relativeError(double result, double expected) {
