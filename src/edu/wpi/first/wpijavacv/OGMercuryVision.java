@@ -16,14 +16,15 @@ import javax.swing.SpinnerNumberModel;
 public class OGMercuryVision extends WPICameraExtension {
     
     //Camera constants used for distance calculation
-    private final int X_RES = 640;		
-    private final int Y_RES = 480;		
-    private final double VERT_FOV = Math.toRadians(49.0);     //Axis M1013
-    private final double HOR_FOV = Math.toRadians(67.0);  //Axis M1013 camera
+    private final static int X_RES = 640;		
+    private final static int Y_RES = 480;		
+    private final static double VERT_FOV = Math.toRadians(49.0);     //Axis M1013
+    private final static double HOR_FOV = Math.toRadians(67.0);  //Axis M1013 camera
     
     public static final String NAME = "OG Vision Tracking";
 
-    private static final double maxHorError = 0.9; //TODO
+    private static final double maxAngleError = 0.4; //TODO
+    private static final double maxHorError = 0.6; //TODO
     private static final double maxVertError = 0.6; //TODO
     private static final double maxRatioError = 0.3; //TODO
     private static final double kNearlyHorizontalSlope = Math.tan(Math.toRadians(20));
@@ -61,10 +62,11 @@ public class OGMercuryVision extends WPICameraExtension {
     private WPIPoint linePt2;
     private int horizontalOffsetPixels;
     private WPIBinaryImage binWPI;
-    
     private static opencv_core.CvMemStorage storage;
     
-    private JLabel distanceID, distanceVal;
+    private ArrayList<PairedTarget> pairs;
+    
+    private JLabel sideDir, distanceVal, numHoriz, numVert;
     private JLabel hueID, satID, valID;
     private JSpinner hueUpper, hueLower, satUpper, satLower, valUpper, valLower;
     private JCheckBox dispBinary;
@@ -72,6 +74,8 @@ public class OGMercuryVision extends WPICameraExtension {
     public OGMercuryVision() {
         morphKernel = opencv_imgproc.IplConvKernel.create(3, 3, 1, 1, opencv_imgproc.CV_SHAPE_RECT, null);
         storage = opencv_core.CvMemStorage.create();
+        
+        pairs = new ArrayList<>();
     }
     
     @Override
@@ -80,7 +84,9 @@ public class OGMercuryVision extends WPICameraExtension {
         this.setLayout(new BorderLayout());
         
         distanceVal = new JLabel();
-        distanceID = new JLabel("Distance:");
+        sideDir = new JLabel();
+        numHoriz = new JLabel();
+        numVert = new JLabel();
         hueID = new JLabel("Hue Limits:");
         satID = new JLabel("Sat Limits:");
         valID = new JLabel("Val Limits:");
@@ -95,11 +101,13 @@ public class OGMercuryVision extends WPICameraExtension {
         valLower = new JSpinner(new SpinnerNumberModel(minVal, 0, 255, 1));
         
         JPanel controls = new JPanel();
-        controls.setLayout(new GridLayout(8, 2));
+        controls.setLayout(new GridLayout(9, 2));
         controls.add(dispBinary);
         controls.add(new JLabel());
-        controls.add(distanceID);
+        controls.add(sideDir);
         controls.add(distanceVal);
+        controls.add(numHoriz);
+        controls.add(numVert);
         controls.add(hueID);
         controls.add(hueUpper); 
         controls.add(new JLabel());
@@ -112,10 +120,6 @@ public class OGMercuryVision extends WPICameraExtension {
         controls.add(valUpper);
         controls.add(new JLabel());
         controls.add(valLower);
-        
-        /*for(int i = 0; i < controls.getComponentCount(); i++) {
-            controls.getComponent(i).setSize(controls.getComponent(i).getWidth(), 25);
-        }*/
         
         add(BorderLayout.WEST, controls);
     }
@@ -179,10 +183,18 @@ public class OGMercuryVision extends WPICameraExtension {
                 vert.add(c.approxPolygon(20));
             }
         }
+        numHoriz.setText("Horiz: " + horiz.size());
+        numVert.setText("Vert: " + vert.size());
+        
         if(vert.size() > 0) {
-            distanceVal.setText("" + getDistance(vert.get(0)));
+            distanceVal.setText("Distance:\n" + getDistance(vert.get(0))); //TODO multiple verticals
         } else {
-            distanceVal.setText("NONE");
+            distanceVal.setText("Distance:\nNONE");
+        }
+        if(pairs.size() > 0) {
+            sideDir.setText("Side:" + (pairs.get(0).isRight? "Right" : "Left")); //TODO mutiple targets
+        } else {
+            sideDir.setText("Side:\nNONE");
         }
         
         opencv_core.cvClearMemStorage(storage);
@@ -193,7 +205,7 @@ public class OGMercuryVision extends WPICameraExtension {
     }
     
     public static double relativeError(double result, double expected) {
-        return Math.abs((result - expected) / expected);
+        return (result - expected) / expected;
     }
     
     public static boolean contains(double lower, double upper, double value) {
@@ -228,9 +240,23 @@ public class OGMercuryVision extends WPICameraExtension {
         return results.toArray(array);
     }
     
-    public double getDistance(WPIPolygon polygon){
+    public static double getDistance(WPIPolygon polygon){
         double distance = (Y_RES * 32 / 12.0) / (polygon.getHeight() * 2 * Math.tan(VERT_FOV / 2.0));
         
         return (int)(distance * 100) / 100.0;
+    }
+    
+    private class PairedTarget {
+        protected WPIPolygon vert, horiz;
+        protected boolean isRight;
+        public PairedTarget(WPIPolygon vert, WPIPolygon horiz) {
+            this.vert = vert;
+            this.horiz = horiz;
+            isRight = isRight();
+        }
+        
+        private boolean isRight() {
+            return horiz.getX()- vert.getX() > 0;
+        }
     }
 }
