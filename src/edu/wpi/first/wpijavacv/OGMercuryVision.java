@@ -81,7 +81,7 @@ public class OGMercuryVision extends WPICameraExtension {
     @Override
     public void init() {
         super.init();
-        this.setLayout(new BorderLayout());
+        setLayout(new BorderLayout());
         
         distanceVal = new JLabel();
         sideDir = new JLabel();
