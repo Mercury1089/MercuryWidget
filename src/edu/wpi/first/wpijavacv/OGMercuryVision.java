@@ -24,23 +24,24 @@ public class OGMercuryVision extends WPICameraExtension {
     public static final String NAME = "OG Vision Tracking";
 
     private static final double maxAngleError = 0.4; //TODO
+    private static final double maxPairError = 0.3;//TODO
     private static final double maxHorError = 0.6; //TODO
     private static final double maxVertError = 0.6; //TODO
-    private static final double maxRatioError = 0.3; //TODO
+    private static final double maxRatioError = 0.5; //TODO
     private static final double kNearlyHorizontalSlope = Math.tan(Math.toRadians(20));
     private static final double kNearlyVerticalSlope = Math.tan(Math.toRadians(90-20));
     private static final int kMinHorWidth = 30; 
     private static final int kMinHorHeight = 5; 
-    private static final int kMaxHorWidth = 150;
-    private static final int kMaxHorHeight = 20;
+    private static final int kMaxHorWidth = 200;
+    private static final int kMaxHorHeight = 35;
     private static final int kMinVertWidth = 5;
     private static final int kMinVertHeight = 45;
-    private static final int kMaxVertWidth = 30;
-    private static final int kMaxVertHeight = 200;
+    private static final int kMaxVertWidth = 65;
+    private static final int kMaxVertHeight = 300;
     private static final double kRangeOffset = 0.0; //TODO
-    private double maxHue = 90, minHue = 45, 
+    private double maxHue = 95, minHue = 50, 
                    maxSat = 255, minSat = 200, 
-                   maxVal = 255, minVal = 55;
+                   maxVal = 255, minVal = 200;
 
     private static final double kShooterOffsetDeg = 0; //TODO
 
@@ -66,7 +67,7 @@ public class OGMercuryVision extends WPICameraExtension {
     
     private ArrayList<PairedTarget> pairs;
     
-    private JLabel sideDir, distanceVal, numHoriz, numVert;
+    private JLabel sideDir, distanceVal, numHoriz, numVert, dispPairs;
     private JLabel hueID, satID, valID;
     private JSpinner hueUpper, hueLower, satUpper, satLower, valUpper, valLower;
     private JCheckBox dispBinary;
@@ -84,6 +85,7 @@ public class OGMercuryVision extends WPICameraExtension {
         setLayout(new BorderLayout());
         
         distanceVal = new JLabel();
+        dispPairs = new JLabel();
         sideDir = new JLabel();
         numHoriz = new JLabel();
         numVert = new JLabel();
@@ -103,7 +105,7 @@ public class OGMercuryVision extends WPICameraExtension {
         JPanel controls = new JPanel();
         controls.setLayout(new GridLayout(9, 2));
         controls.add(dispBinary);
-        controls.add(new JLabel());
+        controls.add(dispPairs);
         controls.add(sideDir);
         controls.add(distanceVal);
         controls.add(numHoriz);
@@ -191,11 +193,24 @@ public class OGMercuryVision extends WPICameraExtension {
         } else {
             distanceVal.setText("Distance:\nNONE");
         }
+        
         if(pairs.size() > 0) {
             sideDir.setText("Side:" + (pairs.get(0).isRight? "Right" : "Left")); //TODO mutiple targets
         } else {
             sideDir.setText("Side:\nNONE");
         }
+        
+        pairs.clear();
+        for(WPIPolygon v : vert) {
+            for(WPIPolygon h : horiz) {
+                pairs.add(isPairedTarget(v, h));
+            }
+        }
+        while(pairs.contains(null)) {
+            pairs.remove(null);
+        }
+        
+        dispPairs.setText("Pairs:" + pairs.size()); //TODO mutiple targets
         
         opencv_core.cvClearMemStorage(storage);
         if(dispBinary.isSelected()) {
@@ -244,6 +259,25 @@ public class OGMercuryVision extends WPICameraExtension {
         double distance = (Y_RES * 32 / 12.0) / (polygon.getHeight() * 2 * Math.tan(VERT_FOV / 2.0));
         
         return (int)(distance * 100) / 100.0;
+    }
+    
+    public PairedTarget isPairedTarget(WPIPolygon vert, WPIPolygon horiz){
+        PairedTarget pt = new PairedTarget(vert, horiz);
+        int dy = horiz.getY() - vert.getY();
+        int dx = horiz.getX() - vert.getX();
+        double pxin = vert.getHeight() / 32.0;
+        double inX = dx/pxin;
+        double inY = dy/pxin;
+        
+        if(pt.isRight){
+            if(relativeError(inX, -9.5) <= maxPairError && relativeError(inY, 2.5) <= maxPairError)
+                return pt;
+            else return null;
+        }else{
+            if(relativeError(inX, 29.5) <= maxPairError && relativeError(inY, 2.5) <= maxPairError)
+                return pt;
+            else return null;
+        }
     }
     
     private class PairedTarget {
