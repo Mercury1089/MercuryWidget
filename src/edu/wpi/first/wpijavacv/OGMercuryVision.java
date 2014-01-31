@@ -81,6 +81,8 @@ public class OGMercuryVision extends WPICameraExtension {
         morphKernel = opencv_imgproc.IplConvKernel.create(3, 3, 1, 1, opencv_imgproc.CV_SHAPE_RECT, null);
         storage = opencv_core.CvMemStorage.create();
         
+        vert = new ArrayList<>();
+        horiz = new ArrayList<>();
         pairs = new ArrayList<>();
     }
     
@@ -185,8 +187,8 @@ public class OGMercuryVision extends WPICameraExtension {
         binWPI = makeWPIBinaryImage(bin);
         contours = findConvexContours(binWPI);
         
-        horiz = new ArrayList<>();
-        vert = new ArrayList<>();
+        horiz.clear();
+        vert.clear();
         for (WPIContour c : contours) {
             double ratio = ((double) c.getHeight()) / ((double) c.getWidth());
             if (relativeError(ratio, 4/23.5) < maxHorError && contains(kMinHorWidth, kMaxHorWidth, c.getWidth())) {
@@ -205,10 +207,6 @@ public class OGMercuryVision extends WPICameraExtension {
             distance = -1;
             distanceVal.setText("Distance:\nNONE");
         }
-        if(vert.size() > 0) {
-            table.putNumber("x", vert.get(0).getX());
-        }
-        table.putNumber("distance", distance);
         
         if(pairs.size() > 0) {
             sideDir.setText("Side:" + (pairs.get(0).isRight? "Right" : "Left")); //TODO mutiple targets
@@ -229,6 +227,12 @@ public class OGMercuryVision extends WPICameraExtension {
         dispPairs.setText("Pairs:" + pairs.size()); //TODO mutiple targets
         
         opencv_core.cvClearMemStorage(storage);
+        
+        if(vert.size() > 0) {
+            table.putNumber("x", vert.get(0).getX());
+        }
+        table.putNumber("distance", distance);
+        
         processTime.setText(System.currentTimeMillis() - startTime + " milliseconds");
         if(dispBinary.isSelected()) {
             return binWPI;
