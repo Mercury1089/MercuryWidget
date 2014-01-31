@@ -4,6 +4,7 @@ import com.googlecode.javacv.cpp.opencv_core;
 import com.googlecode.javacv.cpp.opencv_core.IplImage;
 import com.googlecode.javacv.cpp.opencv_imgproc;
 import edu.wpi.first.smartdashboard.camera.WPICameraExtension;
+import edu.wpi.first.wpilibj.networktables.NetworkTable;
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
 import java.util.ArrayList;
@@ -18,12 +19,13 @@ public class OGMercuryVision extends WPICameraExtension {
     //Camera constants used for distance calculation
     private final static int X_RES = 640;		
     private final static int Y_RES = 480;		
-    private final static double VERT_FOV = Math.toRadians(49.0);     //Axis M1013
+    //private final static double VERT_FOV = Math.toRadians(49.0);     //Axis M1013
+    private final static double VERT_FOV = Math.toRadians(37.4);  //Axis M1011 camera
     private final static double HOR_FOV = Math.toRadians(67.0);  //Axis M1013 camera
     
     public static final String NAME = "OG Vision Tracking";
 
-    private static final double maxAngleError = 0.4; //TODO
+    private static final double maxAngleError = 0.4; //TODOprivate static final double VERT_FOV = 37.4;  //Axis M1011 camera
     private static final double maxPairError = 0.3;//TODO
     private static final double maxHorError = 0.6; //TODO
     private static final double maxVertError = 0.6; //TODO
@@ -41,7 +43,7 @@ public class OGMercuryVision extends WPICameraExtension {
     private static final double kRangeOffset = 0.0; //TODO
     private double maxHue = 95, minHue = 50, 
                    maxSat = 255, minSat = 200, 
-                   maxVal = 255, minVal = 200;
+                   maxVal = 255, minVal = 150;
 
     private static final double kShooterOffsetDeg = 0; //TODO
 
@@ -64,13 +66,16 @@ public class OGMercuryVision extends WPICameraExtension {
     private int horizontalOffsetPixels;
     private WPIBinaryImage binWPI;
     private static opencv_core.CvMemStorage storage;
+    private IplImage input;
     
     private ArrayList<PairedTarget> pairs;
     
-    private JLabel sideDir, distanceVal, numHoriz, numVert, dispPairs;
+    private JLabel sideDir, distanceVal, numHoriz, numVert, dispPairs, processTime;
     private JLabel hueID, satID, valID;
     private JSpinner hueUpper, hueLower, satUpper, satLower, valUpper, valLower;
     private JCheckBox dispBinary;
+    private double distance;
+    private NetworkTable table;
     
     public OGMercuryVision() {
         morphKernel = opencv_imgproc.IplConvKernel.create(3, 3, 1, 1, opencv_imgproc.CV_SHAPE_RECT, null);
@@ -84,6 +89,9 @@ public class OGMercuryVision extends WPICameraExtension {
         super.init();
         setLayout(new BorderLayout());
         
+        table = NetworkTable.getTable("SmartDashboard");
+        
+        processTime = new JLabel();
         distanceVal = new JLabel();
         dispPairs = new JLabel();
         sideDir = new JLabel();
@@ -112,7 +120,7 @@ public class OGMercuryVision extends WPICameraExtension {
         controls.add(numVert);
         controls.add(hueID);
         controls.add(hueUpper); 
-        controls.add(new JLabel());
+        controls.add(processTime);
         controls.add(hueLower);
         controls.add(satID);
         controls.add(satUpper);
@@ -126,8 +134,10 @@ public class OGMercuryVision extends WPICameraExtension {
         add(BorderLayout.WEST, controls);
     }
     
+    private long startTime;
     @Override
     public WPIImage processImage(WPIColorImage raw) {
+        startTime = System.currentTimeMillis();
         //if fields are wrong, initialize them
         if(size == null || size.width() != raw.getWidth() || size.height() != raw.getHeight()) {
             size = opencv_core.cvSize(raw.getWidth(),raw.getHeight());
@@ -151,12 +161,12 @@ public class OGMercuryVision extends WPICameraExtension {
         maxVal = (Double)valUpper.getValue();
         
         //split the image into H, S, and V layers
-        IplImage input = raw.image;
+        input = raw.image;
         opencv_imgproc.cvCvtColor(input, hsv, opencv_imgproc.CV_BGR2HSV);
         opencv_core.cvSplit(hsv, hue, sat, val, null);
         
-        //remove pixels where H < 45 or H > 75
-        opencv_imgproc.cvThreshold(hue, bin, minHue, 255, opencv_imgproc.CV_THRESH_BINARY); //TODO change values maybe
+        //remove pixels that aren't green/cyan
+        opencv_imgproc.cvThreshold(hue, bin, minHue, 255, opencv_imgproc.CV_THRESH_BINARY);
         opencv_imgproc.cvThreshold(hue, hue, maxHue, 255, opencv_imgproc.CV_THRESH_BINARY_INV);
         
         // remove pixels that aren't colorful enough
@@ -189,10 +199,16 @@ public class OGMercuryVision extends WPICameraExtension {
         numVert.setText("Vert: " + vert.size());
         
         if(vert.size() > 0) {
-            distanceVal.setText("Distance:\n" + getDistance(vert.get(0))); //TODO multiple verticals
+            distance = getDistance(vert.get(0));
+            distanceVal.setText("Distance:\n" + distance); //TODO multiple verticals
         } else {
+            distance = -1;
             distanceVal.setText("Distance:\nNONE");
         }
+        if(vert.size() > 0) {
+            table.putNumber("x", vert.get(0).getX());
+        }
+        table.putNumber("distance", distance);
         
         if(pairs.size() > 0) {
             sideDir.setText("Side:" + (pairs.get(0).isRight? "Right" : "Left")); //TODO mutiple targets
@@ -213,6 +229,7 @@ public class OGMercuryVision extends WPICameraExtension {
         dispPairs.setText("Pairs:" + pairs.size()); //TODO mutiple targets
         
         opencv_core.cvClearMemStorage(storage);
+        processTime.setText(System.currentTimeMillis() - startTime + " milliseconds");
         if(dispBinary.isSelected()) {
             return binWPI;
         } else
