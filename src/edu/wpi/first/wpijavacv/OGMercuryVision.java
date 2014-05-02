@@ -19,9 +19,9 @@ public class OGMercuryVision extends WPICameraExtension {
     //Camera constants used for distance calculation
     private final static int X_RES = 640;		
     private final static int Y_RES = 480;		
-    //private final static double VERT_FOV = Math.toRadians(49.0);     //Axis M1013
-    private final static double VERT_FOV = Math.toRadians(37.4);  //Axis M1011 camera
-    private final static double HOR_FOV = Math.toRadians(67.0);  //Axis M1013 camera
+    private final static double HOR_FOV = Math.toRadians(67.0);    //Axis M1013 camera
+    //private final static double VERT_FOV = Math.toRadians(37.4);   //Axis M1011 camera
+    private final static double VERT_FOV = Math.toRadians(49.0); //Axis M1013
     
     public static final String NAME = "OG Vision Tracking";
 
@@ -232,6 +232,11 @@ public class OGMercuryVision extends WPICameraExtension {
             table.putNumber("x", vert.get(0).getX());
         }
         table.putNumber("distance", distance);
+        table.putBoolean("hot", horiz.size() == 1);
+        
+        if(pairs.size() >= 2)table.putNumber("side", 2);
+        else if(pairs.size() == 1)table.putNumber("side", pairs.get(0).isRight() ? 1 : 0);
+        else table.putNumber("side", -1);
         
         processTime.setText(System.currentTimeMillis() - startTime + " milliseconds");
         if(dispBinary.isSelected()) {
